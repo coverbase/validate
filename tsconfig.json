@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+      "lib": ["ESNext"],
+      "target": "ESNext",
+      "module": "ESNext",
+      "moduleDetection": "force",
+
+      /* Bundler mode */
+      "moduleResolution": "bundler",
+      "verbatimModuleSyntax": true,
+      "declaration": true,
+      "outDir": "./dist",
+
+      /* Linting */
+      "strict": true,
+      "skipLibCheck": true,
+      "noFallthroughCasesInSwitch": true,
+      "forceConsistentCasingInFileNames": true
+  },
+  "include": ["./src"]
+}
