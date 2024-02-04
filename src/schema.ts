@@ -1,5 +1,5 @@
-import type { Pipe } from "./pipe";
-import { ValidationError, createResult, type Result } from "./result";
+import { withPipes, type Pipe } from "./pipe";
+import { ValidationError, type Result } from "./result";
 
 export type Schema<T = any> = {
     parse: (input: unknown) => Result<T>;
@@ -17,13 +17,13 @@ export const string = (...args: Args<string>): Schema<string> => {
     return {
         parse: (input) => {
             if (typeof input === "string") {
-                return createResult(input);
+                return withPipes(input, args);
             }
 
-            return createResult(
-                input,
-                args.filter((arg): arg is string => typeof arg === "string"),
-            );
+            return {
+                output: input,
+                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+            };
         },
     };
 };
@@ -32,13 +32,13 @@ export const number = (...args: Args<number>): Schema<number> => {
     return {
         parse: (input) => {
             if (typeof input === "number") {
-                return createResult(input);
+                return withPipes(input, args);
             }
 
-            return createResult(
-                input,
-                args.filter((arg): arg is string => typeof arg === "string"),
-            );
+            return {
+                output: input,
+                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+            };
         },
     };
 };
@@ -47,13 +47,13 @@ export const bigint = (...args: Args<bigint>): Schema<bigint> => {
     return {
         parse: (input) => {
             if (typeof input === "bigint") {
-                return createResult(input);
+                return withPipes(input, args);
             }
 
-            return createResult(
-                input,
-                args.filter((arg): arg is string => typeof arg === "string"),
-            );
+            return {
+                output: input,
+                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+            };
         },
     };
 };
@@ -62,13 +62,13 @@ export const boolean = (...args: Args<boolean>): Schema<boolean> => {
     return {
         parse: (input) => {
             if (typeof input === "boolean") {
-                return createResult(input);
+                return withPipes(input, args);
             }
 
-            return createResult(
-                input,
-                args.filter((arg): arg is string => typeof arg === "string"),
-            );
+            return {
+                output: input,
+                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+            };
         },
     };
 };
@@ -80,22 +80,34 @@ export const object = <T extends Record<string, Schema>>(
     return {
         parse: (input) => {
             if (input && typeof input === "object") {
-                return Object.entries(entries).reduce((result, [key, schema]) => {
-                    const value = (input as Record<string, unknown>)[key];
+                let messages: Array<string> | undefined;
 
-                    const { output, errorMessages } = schema.parse(value);
+                for (const [key, schema] of Object.entries(entries)) {
+                    const { output, errorMessages } = schema.parse(
+                        (input as Record<string, any>)[key],
+                    );
 
-                    (result.output as Record<string, any>)[key] = output;
-                    result.errorMessages.push(...errorMessages);
+                    (input as Record<string, any>)[key] = output;
 
-                    return result;
-                }, createResult(input));
+                    if (errorMessages) {
+                        messages ? messages.push(...errorMessages) : (messages = errorMessages);
+                    }
+                }
+
+                if (messages) {
+                    return {
+                        output: input as Resolve<T>,
+                        errorMessages: messages,
+                    };
+                }
+
+                return withPipes(input as Resolve<T>, args);
             }
 
-            return createResult(
-                input,
-                args.filter((arg): arg is string => typeof arg === "string"),
-            );
+            return {
+                output: input,
+                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+            };
         },
     };
 };
@@ -110,15 +122,22 @@ export const array = <T extends Schema>(
                 const results = input.map((value) => schema.parse(value));
 
                 const outputs = results.flatMap(({ output }) => output);
-                const errorMessages = results.flatMap(({ errorMessages }) => errorMessages);
+                const errorMessages = results.flatMap(({ errorMessages }) => errorMessages ?? []);
 
-                return createResult(outputs, errorMessages);
+                if (errorMessages.length > 0) {
+                    return {
+                        output: outputs,
+                        errorMessages: errorMessages,
+                    };
+                }
+
+                return withPipes(outputs, args);
             }
 
-            return createResult(
-                input,
-                args.filter((arg): arg is string => typeof arg === "string"),
-            );
+            return {
+                output: input,
+                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+            };
         },
     };
 };
@@ -132,9 +151,9 @@ export const optional = <T extends Schema>({ parse }: T): Schema<Output<T> | und
 export const parse = <T extends Schema>(schema: T, input: unknown): Output<T> => {
     const { output, errorMessages } = schema.parse(input);
 
-    if (errorMessages.length > 0) {
+    if (errorMessages) {
         throw new ValidationError(errorMessages);
     }
 
-    return output as Output<T>;
+    return output;
 };

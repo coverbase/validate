@@ -1,16 +1,16 @@
 export type ErrorMessage = string;
 
-export type Result<T> = {
-    output: T | unknown;
+export type Success<T> = {
+    output: T;
+    errorMessages?: Array<ErrorMessage>;
+};
+
+export type Failure = {
+    output: unknown;
     errorMessages: Array<ErrorMessage>;
 };
 
-export const createResult = <T>(output: T, errorMessages: Array<ErrorMessage> = []): Result<T> => {
-    return {
-        output,
-        errorMessages,
-    };
-};
+export type Result<T> = Success<T> | Failure;
 
 export class ValidationError extends Error {
     readonly errorMessages: Array<ErrorMessage>;
