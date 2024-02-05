@@ -73,6 +73,29 @@ export const boolean = (...args: Args<boolean>): Schema<boolean> => {
     };
 };
 
+export const date = (...args: Args<Date>): Schema<Date> => {
+    return {
+        parse: (input) => {
+            if (input instanceof Date) {
+                return withPipes(input, args);
+            }
+
+            return {
+                output: input,
+                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+            };
+        },
+    };
+};
+
+export const any = (...args: Args<any>): Schema<any> => {
+    return {
+        parse: (input) => {
+            return withPipes(input, args);
+        },
+    };
+};
+
 export const object = <T extends Record<string, Schema>>(
     entries: T,
     ...args: Args<Resolve<T>>
@@ -142,9 +165,20 @@ export const array = <T extends Schema>(
     };
 };
 
-export const optional = <T extends Schema>({ parse }: T): Schema<Output<T> | undefined> => {
+export const optional = <T extends Schema>(
+    schema: T,
+    defaultValue?: T,
+): Schema<Output<T> | undefined> => {
     return {
-        parse,
+        parse: (input) => {
+            if (input === undefined) {
+                return {
+                    output: input ?? defaultValue,
+                };
+            }
+
+            return schema.parse(input);
+        },
     };
 };
 
