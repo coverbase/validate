@@ -1,135 +1,113 @@
-import { withPipes, type Pipe } from "./pipe";
-import { ValidationError, type Result } from "./result";
+export type Output<T> = T extends Schema<infer U> ? U : unknown;
 
-export type Schema<T = any> = {
-    parse: (input: unknown) => Result<T>;
+export type Success<T> = {
+    output: T;
+    errorMessages?: Array<string>;
 };
 
-export type Output<T extends Schema> = T extends Schema<infer U> ? U : unknown;
+export type Failure = {
+    output: unknown;
+    errorMessages: Array<string>;
+};
 
-export type Args<T> = Array<Pipe<T> | string>;
+export type Schema<T = any> = {
+    parse: (input: unknown) => Success<T> | Failure;
+};
 
 export type Resolve<T extends Record<string, Schema>> = {
     [Key in keyof T]: Output<T[Key]>;
 };
 
-export const string = (...args: Args<string>): Schema<string> => {
+export const string = (errorMessage?: string): Schema<string> => {
     return {
         parse: (input) => {
             if (typeof input === "string") {
-                return withPipes(input, args);
+                return {
+                    output: input,
+                };
             }
 
             return {
                 output: input,
-                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+                errorMessages: [errorMessage ?? "String"],
             };
         },
     };
 };
 
-export const number = (...args: Args<number>): Schema<number> => {
+export const number = (errorMessage?: string): Schema<number> => {
     return {
         parse: (input) => {
             if (typeof input === "number") {
-                return withPipes(input, args);
+                return {
+                    output: input,
+                };
             }
 
             return {
                 output: input,
-                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+                errorMessages: [errorMessage ?? "Number"],
             };
         },
     };
 };
 
-export const bigint = (...args: Args<bigint>): Schema<bigint> => {
+export const bigint = (errorMessage?: string): Schema<bigint> => {
     return {
         parse: (input) => {
             if (typeof input === "bigint") {
-                return withPipes(input, args);
+                return {
+                    output: input,
+                };
             }
 
             return {
                 output: input,
-                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+                errorMessages: [errorMessage ?? "Bigint"],
             };
         },
     };
 };
 
-export const boolean = (...args: Args<boolean>): Schema<boolean> => {
+export const boolean = (errorMessage?: string): Schema<boolean> => {
     return {
         parse: (input) => {
             if (typeof input === "boolean") {
-                return withPipes(input, args);
+                return {
+                    output: input,
+                };
             }
 
             return {
                 output: input,
-                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+                errorMessages: [errorMessage ?? "Boolean"],
             };
         },
     };
 };
 
-export const date = (...args: Args<Date>): Schema<Date> => {
+export const date = (errorMessage?: string): Schema<Date> => {
     return {
         parse: (input) => {
             if (input instanceof Date) {
-                return withPipes(input, args);
+                return {
+                    output: input,
+                };
             }
 
             return {
                 output: input,
-                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+                errorMessages: [errorMessage ?? "Date"],
             };
         },
     };
 };
 
-export const any = (...args: Args<any>): Schema<any> => {
+export const any = (): Schema<any> => {
     return {
         parse: (input) => {
-            return withPipes(input, args);
-        },
-    };
-};
-
-export const object = <T extends Record<string, Schema>>(
-    entries: T,
-    ...args: Args<Resolve<T>>
-): Schema<Resolve<T>> => {
-    return {
-        parse: (input) => {
-            if (input && typeof input === "object") {
-                let messages: Array<string> | undefined;
-
-                for (const [key, schema] of Object.entries(entries)) {
-                    const { output, errorMessages } = schema.parse(
-                        (input as Record<string, any>)[key],
-                    );
-
-                    (input as Record<string, any>)[key] = output;
-
-                    if (errorMessages) {
-                        messages ? messages.push(...errorMessages) : (messages = errorMessages);
-                    }
-                }
-
-                if (messages) {
-                    return {
-                        output: input as Resolve<T>,
-                        errorMessages: messages,
-                    };
-                }
-
-                return withPipes(input as Resolve<T>, args);
-            }
-
             return {
                 output: input,
-                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
             };
         },
     };
@@ -137,7 +115,7 @@ export const object = <T extends Record<string, Schema>>(
 
 export const array = <T extends Schema>(
     schema: T,
-    ...args: Args<Array<Output<T>>>
+    errorMessage?: string,
 ): Schema<Array<Output<T>>> => {
     return {
         parse: (input) => {
@@ -147,19 +125,62 @@ export const array = <T extends Schema>(
                 const outputs = results.flatMap(({ output }) => output);
                 const errorMessages = results.flatMap(({ errorMessages }) => errorMessages ?? []);
 
-                if (errorMessages.length > 0) {
+                if (errorMessages.length) {
                     return {
                         output: outputs,
-                        errorMessages: errorMessages,
+                        errorMessages,
                     };
                 }
 
-                return withPipes(outputs, args);
+                return {
+                    output: outputs,
+                };
             }
 
             return {
                 output: input,
-                errorMessages: args.filter((arg): arg is string => typeof arg === "string"),
+                errorMessages: [errorMessage ?? "Array"],
+            };
+        },
+    };
+};
+
+export const object = <T extends Record<string, Schema>>(
+    entries: T,
+    errorMessage?: string,
+): Schema<Resolve<T>> => {
+    return {
+        parse: (input) => {
+            if (typeof input === "object") {
+                const messages: Array<string> = [];
+
+                for (const [key, schema] of Object.entries(entries)) {
+                    const { output, errorMessages } = schema.parse(
+                        (input as Record<string, any>)[key],
+                    );
+
+                    (input as Record<string, any>)[key] = output;
+
+                    if (errorMessages) {
+                        messages.push(...errorMessages);
+                    }
+                }
+
+                if (messages.length) {
+                    return {
+                        output: input,
+                        errorMessages: messages,
+                    };
+                }
+
+                return {
+                    output: input as Resolve<T>,
+                };
+            }
+
+            return {
+                output: input,
+                errorMessages: [errorMessage ?? "Object"],
             };
         },
     };
@@ -167,7 +188,7 @@ export const array = <T extends Schema>(
 
 export const optional = <T extends Schema>(
     schema: T,
-    defaultValue?: T,
+    defaultValue?: Output<T>,
 ): Schema<Output<T> | undefined> => {
     return {
         parse: (input) => {
@@ -186,7 +207,7 @@ export const parse = <T extends Schema>(schema: T, input: unknown): Output<T> =>
     const { output, errorMessages } = schema.parse(input);
 
     if (errorMessages) {
-        throw new ValidationError(errorMessages);
+        throw new Error(errorMessages.join(", "));
     }
 
     return output;
