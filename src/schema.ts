@@ -103,6 +103,40 @@ export const date = (errorMessage?: string): Schema<Date> => {
     };
 };
 
+export const blob = (errorMessage?: string): Schema<Blob> => {
+    return {
+        parse: (input) => {
+            if (input instanceof Blob) {
+                return {
+                    output: input,
+                };
+            }
+
+            return {
+                output: input,
+                errorMessages: [errorMessage ?? "Blob"],
+            };
+        },
+    };
+};
+
+export const file = (errorMessage?: string): Schema<File> => {
+    return {
+        parse: (input) => {
+            if (input instanceof File) {
+                return {
+                    output: input,
+                };
+            }
+
+            return {
+                output: input,
+                errorMessages: [errorMessage ?? "File"],
+            };
+        },
+    };
+};
+
 export const any = (): Schema<any> => {
     return {
         parse: (input) => {
